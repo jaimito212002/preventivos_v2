@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dispositivos {{ tipo }} - Preventivos</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📱 {{ tipo }}</h1>
+            <p>Tienda: {{ tienda_actual }}</p>
+        </header>
+
+        <nav class="tienda-selector">
+            <label for="tienda">Selecciona Tienda:</label>
+            <select id="tienda" onchange="cambiarTienda()">
+                {% for t in todas_tiendas %}
+                    <option value="{{ t }}" {% if t == tienda_actual %}selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+            </select>
+        </nav>
+
+        <div class="content">
+            {% if dispositivos %}
+                <div class="dispositivos-lista">
+                    {% for dispositivo in dispositivos %}
+                        <div class="dispositivo-item" id="dispositivo-{{ dispositivo.id }}">
+                            <form method="POST" action="/actualizar_dispositivo/{{ dispositivo.id }}" class="dispositivo-form" onsubmit="return enviarFormulario(event, {{ dispositivo.id }})">
+                                <div class="dispositivo-campo">
+                                    <label>Nombre:</label>
+                                    <input type="text" name="nombre" value="{{ dispositivo.nombre }}" required>
+                                </div>
+
+                                <div class="dispositivo-campo">
+                                    <label>IP:</label>
+                                    <input type="text" name="ip" value="{{ dispositivo.ip }}" required>
+                                </div>
+
+                                <div class="dispositivo-campo">
+                                    <label>Hostname:</label>
+                                    <input type="text" name="hostname" value="{{ dispositivo.hostname if dispositivo.hostname else '' }}" placeholder="(Opcional)">
+                                </div>
+
+                                <div class="dispositivo-campo-tipo">
+                                    <label>Tipo:</label>
+                                    <div class="tipo-con-estado">
+                                        <input type="text" name="tipo" value="{{ dispositivo.tipo }}" readonly class="readonly">
+                                        <span class="estado-guardado" id="estado-{{ dispositivo.id }}"></span>
+                                    </div>
+                                </div>
+
+                                <input type="hidden" name="tienda" value="{{ tienda_actual }}">
+
+                                <div class="dispositivo-acciones">
+                                    <button type="submit" class="btn-guardar" id="btn-guardar-{{ dispositivo.id }}">💾 Guardar</button>
+                                    <button type="button" class="btn-eliminar-dispositivo" onclick="eliminarDispositivo({{ dispositivo.id }}, '{{ tipo }}', '{{ tienda_actual }}', '{{ dispositivo.nombre }}')">🗑️ Eliminar</button>
+                                </div>
+                            </form>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <p>No hay dispositivos de este tipo en {{ tienda_actual }}</p>
+                </div>
+            {% endif %}
+
+            <div class="admin-section">
+                <a href="/dispositivos?tienda={{ tienda_actual }}" class="btn-back">⬅️ Volver a Dispositivos</a>
+                <a href="/?tienda={{ tienda_actual }}" class="btn-back">🏠 Ir al Menú Principal</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function cambiarTienda() {
+            const tienda = document.getElementById('tienda').value;
+            window.location.href = '/dispositivos/tipo?tipo={{ tipo | urlencode }}&tienda=' + tienda;
+        }
+
+        function enviarFormulario(event, dispositivoId) {
+            event.preventDefault();
+            const form = event.target;
+            
+            // Obtener datos del formulario
+            const formData = new FormData(form);
+            const action = form.action;
+
+            // Hacer la petición
+            fetch(action, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Mostrar icono de éxito
+                    const estadoElement = document.getElementById(`estado-${dispositivoId}`);
+                    estadoElement.innerHTML = '✅ ¡Guardado!';
+                    estadoElement.classList.add('estado-exito');
+                    
+                    // No limpiar el mensaje, se queda permanente
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                const estadoElement = document.getElementById(`estado-${dispositivoId}`);
+                estadoElement.innerHTML = '❌ Error';
+                estadoElement.classList.add('estado-error');
+            });
+        }
+
+        function eliminarDispositivo(dispositivoId, tipo, tienda, nombre) {
+            // Confirmar eliminación
+            if (!confirm(`⚠️ ¿Estás seguro de que quieres eliminar "${nombre}"?\n\nEsta acción no se puede deshacer.`)) {
+                return;
+            }
+
+            // Crear formulario de eliminación
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/eliminar_dispositivo/${dispositivoId}`;
+
+            const tipoInput = document.createElement('input');
+            tipoInput.type = 'hidden';
+            tipoInput.name = 'tipo';
+            tipoInput.value = tipo;
+            form.appendChild(tipoInput);
+
+            const tiendaInput = document.createElement('input');
+            tiendaInput.type = 'hidden';
+            tiendaInput.name = 'tienda';
+            tiendaInput.value = tienda;
+            form.appendChild(tiendaInput);
+
+            // Enviar formulario
+            fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form)
+            })
+            .then(response => {
+                if (response.ok || response.status === 303) {
+                    // Mostrar animación de eliminación
+                    const dispositivoElement = document.getElementById(`dispositivo-${dispositivoId}`);
+                    dispositivoElement.classList.add('eliminado');
+
+                    // Redirigir después de 0.75 segundos (el doble de rápido)
+                    setTimeout(() => {
+                        window.location.href = `/dispositivos/tipo?tipo=${encodeURIComponent(tipo)}&tienda=${tienda}&eliminado=${dispositivoId}`;
+                    }, 750);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error al eliminar el dispositivo');
+            });
+        }
+
+        // Mostrar mensaje si viene de actualización
+        window.addEventListener('DOMContentLoaded', function() {
+            const params = new URLSearchParams(window.location.search);
+            const actualizado = params.get('actualizado');
+            
+            if (actualizado) {
+                const estadoElement = document.getElementById(`estado-${actualizado}`);
+                if (estadoElement) {
+                    estadoElement.innerHTML = '✅ ¡Guardado!';
+                    estadoElement.classList.add('estado-exito');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

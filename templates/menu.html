@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preventivos - Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Sistema de Preventivos</h1>
+            <p>Monitoreo de dispositivos de IT</p>
+        </header>
+
+        <nav class="tienda-selector">
+            <label for="tienda">Selecciona Tienda:</label>
+            <select id="tienda" onchange="cambiarTienda()">
+                {% for t in todas_tiendas %}
+                    <option value="{{ t }}" {% if t == tienda_actual %}selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+            </select>
+        </nav>
+
+        <div class="tienda-info">
+            <div class="tienda-info-content">
+                <p>📍 Estás en: <strong>{{ tienda_actual }}</strong></p>
+                <form method="POST" action="/eliminar_tienda" class="form-eliminar-tienda" id="form-eliminar-tienda">
+                    <input type="hidden" name="tienda" value="{{ tienda_actual }}">
+                    <button type="submit" class="btn-eliminar-tienda" onclick="return confirmarEliminarTienda('{{ tienda_actual }}')">🗑️ Eliminar tienda</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- BARRA DE BÚSQUEDA -->
+            <div class="barra-busqueda">
+                <input type="text" id="busqueda" placeholder="🔍 Buscar tipo de dispositivo..." onkeyup="filtrarTipos()">
+                <button class="btn-limpiar" onclick="limpiarBusqueda()">✕ Limpiar</button>
+            </div>
+
+            <div class="tipos-grid" id="tipos-grid">
+                {% for tipo in tipos %}
+                    <div class="tipo-card" data-tipo="{{ tipo }}">
+                        <h2>{{ tipo }}</h2>
+                        <form method="POST" action="/ping_tipo" class="ping-form">
+                            <input type="hidden" name="tipo" value="{{ tipo }}">
+                            <input type="hidden" name="tienda" value="{{ tienda_actual }}">
+                            <button type="submit" class="btn-ping">🔔 PING</button>
+                        </form>
+                        <div class="device-count">
+                            <p>
+                                {% set count = conteo_por_tipo.get(tipo, 0) %}
+                                {% if count == 0 %}
+                                    <span class="sin-dispositivos">Sin dispositivos</span>
+                                {% elif count == 1 %}
+                                    {{ count }} dispositivo
+                                {% else %}
+                                    {{ count }} dispositivos
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div class="admin-section">
+                <a href="/dispositivos?tienda={{ tienda_actual }}" class="btn-devices">📱 Gestionar Dispositivos</a>
+                <a href="/add_dispositivo" class="btn-add">➕ Agregar Dispositivo</a>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="footer-content">
+            <p>
+                © 2026 Sistema de Preventivos
+                <span class="footer-divider">|</span>
+                Desarrollado por <a href="#">Jaime Pulido</a>
+                <span class="footer-divider">|</span>
+                Todos los derechos reservados
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        function cambiarTienda() {
+            const tienda = document.getElementById('tienda').value;
+            window.location.href = '/?tienda=' + tienda;
+        }
+
+        function confirmarEliminarTienda(tienda) {
+            return confirm(`⚠️ ¿Estás SEGURO de que quieres eliminar TODA la tienda "${tienda}" y todos sus dispositivos?\n\n⛔ Esta acción NO se puede deshacer.`);
+        }
+
+        // Función para filtrar tipos
+        function filtrarTipos() {
+            const busqueda = document.getElementById('busqueda').value.toLowerCase();
+            const tarjetas = document.querySelectorAll('.tipo-card');
+
+            tarjetas.forEach(tarjeta => {
+                const tipo = tarjeta.getAttribute('data-tipo').toLowerCase();
+                if (tipo.includes(busqueda)) {
+                    tarjeta.style.display = '';
+                } else {
+                    tarjeta.style.display = 'none';
+                }
+            });
+        }
+
+        // Función para limpiar búsqueda
+        function limpiarBusqueda() {
+            document.getElementById('busqueda').value = '';
+            filtrarTipos();
+            document.getElementById('busqueda').focus();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestionar Dispositivos - Preventivos</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📱 Gestionar Dispositivos</h1>
+            <p>Edita, modifica y elimina dispositivos</p>
+        </header>
+
+        <nav class="tienda-selector">
+            <label for="tienda">Selecciona Tienda:</label>
+            <select id="tienda" onchange="cambiarTienda()">
+                {% for t in todas_tiendas %}
+                    <option value="{{ t }}" {% if t == tienda_actual %}selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+            </select>
+        </nav>
+
+        <div class="tienda-info">
+            <div class="tienda-info-content">
+                <p>📍 Estás en: <strong>{{ tienda_actual }}</strong></p>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="tipos-grid">
+                {% for tipo in tipos %}
+                    <div class="tipo-card">
+                        <h2>{{ tipo }}</h2>
+                        <a href="/dispositivos/tipo?tipo={{ tipo | urlencode }}&tienda={{ tienda_actual }}" class="btn-ver-dispositivos">
+                            👁️ Ver Dispositivos
+                        </a>
+                        <div class="device-count">
+                            <p>
+                                {% set count = conteo_por_tipo.get(tipo, 0) %}
+                                {% if count == 0 %}
+                                    <span class="sin-dispositivos">Sin dispositivos</span>
+                                {% elif count == 1 %}
+                                    {{ count }} dispositivo
+                                {% else %}
+                                    {{ count }} dispositivos
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div class="admin-section">
+                <a href="/?tienda={{ tienda_actual }}" class="btn-back">⬅️ Volver al Menú</a>
+                <a href="/add_dispositivo" class="btn-add">➕ Agregar Dispositivo</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function cambiarTienda() {
+            const tienda = document.getElementById('tienda').value;
+            window.location.href = '/dispositivos?tienda=' + tienda;
+        }
+    </script>
+</body>
+</html>

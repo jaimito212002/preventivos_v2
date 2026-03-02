@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agregar Dispositivo - Preventivos</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>➕ Agregar Nuevo Dispositivo</h1>
+        </header>
+
+        <div class="content">
+            {% if error %}
+                <div class="error-message">
+                    <p>❌ {{ error }}</p>
+                </div>
+            {% endif %}
+
+            <form method="POST" action="/add_dispositivo" class="form-dispositivo" id="form-dispositivo">
+                <div class="form-group">
+                    <label for="nombre">Nombre del Dispositivo:</label>
+                    <input type="text" id="nombre" name="nombre" required placeholder="Ej: AP-Entrada-01">
+                </div>
+
+                <div class="form-group">
+                    <label for="ip">Dirección IP:</label>
+                    <input type="text" id="ip" name="ip" required placeholder="Ej: 192.168.1.100">
+                </div>
+
+                <div class="form-group">
+                    <label for="hostname">Hostname: <span class="opcional">(Opcional)</span></label>
+                    <input type="text" id="hostname" name="hostname" placeholder="Ej: retes277-nb001">
+                    <p class="hint">💡 Se usará para hacer ping si la IP falla</p>
+                </div>
+
+                <div class="form-group">
+                    <label for="tipo">Tipo de Dispositivo:</label>
+                    <select id="tipo" name="tipo" required>
+                        <option value="">Selecciona un tipo</option>
+                        {% for t in tipos %}
+                            <option value="{{ t }}">{{ t }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group tienda-selection">
+                    <p class="tienda-label">Selecciona cómo asignar la tienda:</p>
+                    
+                    <div class="tienda-option">
+                        <input type="radio" id="usar-existente" name="tipo_tienda" value="existente" checked onchange="actualizarTienda()">
+                        <label for="usar-existente">Usar tienda existente</label>
+                    </div>
+
+                    <div id="tienda-existente-group" class="tienda-subgroup">
+                        <select id="tienda" name="tienda">
+                            <option value="">Selecciona una tienda</option>
+                            {% for t in todas_tiendas %}
+                                <option value="{{ t }}">{{ t }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="tienda-option">
+                        <input type="radio" id="crear-nueva" name="tipo_tienda" value="nueva" onchange="actualizarTienda()">
+                        <label for="crear-nueva">Crear nueva tienda</label>
+                    </div>
+
+                    <div id="tienda-nueva-group" class="tienda-subgroup" style="display: none;">
+                        <input type="text" id="nueva_tienda" name="nueva_tienda" placeholder="Ej: STO304">
+                        <p class="hint">💡 Código de la tienda (máx. 20 caracteres)</p>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-submit">✅ Guardar Dispositivo</button>
+                    <a href="/" class="btn-cancel">❌ Cancelar</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function actualizarTienda() {
+            const tipoTienda = document.querySelector('input[name="tipo_tienda"]:checked').value;
+            const tiendaExistenteGroup = document.getElementById('tienda-existente-group');
+            const tiendaNuevaGroup = document.getElementById('tienda-nueva-group');
+            const selectTienda = document.getElementById('tienda');
+            const inputNuevaTienda = document.getElementById('nueva_tienda');
+
+            if (tipoTienda === 'existente') {
+                tiendaExistenteGroup.style.display = 'block';
+                tiendaNuevaGroup.style.display = 'none';
+                selectTienda.required = true;
+                inputNuevaTienda.required = false;
+                inputNuevaTienda.value = '';
+            } else {
+                tiendaExistenteGroup.style.display = 'none';
+                tiendaNuevaGroup.style.display = 'block';
+                selectTienda.required = false;
+                selectTienda.value = '';
+                inputNuevaTienda.required = true;
+                inputNuevaTienda.focus();
+            }
+        }
+
+        // Validación adicional antes de enviar
+        document.getElementById('form-dispositivo').addEventListener('submit', function(e) {
+            const tipoTienda = document.querySelector('input[name="tipo_tienda"]:checked').value;
+            const selectTienda = document.getElementById('tienda');
+            const inputNuevaTienda = document.getElementById('nueva_tienda');
+
+            if (tipoTienda === 'existente' && !selectTienda.value) {
+                e.preventDefault();
+                alert('Por favor, selecciona una tienda existente');
+                return false;
+            }
+
+            if (tipoTienda === 'nueva' && !inputNuevaTienda.value.trim()) {
+                e.preventDefault();
+                alert('Por favor, ingresa el código de la nueva tienda');
+                return false;
+            }
+        });
+    </script>
+</body>
+</html>

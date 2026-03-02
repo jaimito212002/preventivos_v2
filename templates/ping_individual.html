@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PING Individual - Preventivos</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .ping-individual-container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 30px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .dispositivo-info {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .dispositivo-info h2 {
+            color: #333;
+            margin: 0 0 15px 0;
+            font-size: 1.3em;
+        }
+
+        .dispositivo-detalle {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 10px;
+            font-size: 0.95em;
+        }
+
+        .dispositivo-detalle span {
+            flex: 1;
+        }
+
+        .dispositivo-detalle strong {
+            color: #0051BA;
+        }
+
+        .ping-resultado {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 25px;
+            text-align: center;
+        }
+
+        .ping-estado {
+            font-size: 3em;
+            margin: 20px 0;
+        }
+
+        .ping-estado.online {
+            color: #28a745;
+        }
+
+        .ping-estado.offline {
+            color: #dc3545;
+        }
+
+        .ping-estado.procesando {
+            color: #0051BA;
+        }
+
+        .ping-intento {
+            font-size: 1.5em;
+            color: #666;
+            margin: 15px 0;
+            font-weight: 600;
+        }
+
+        .spinner-individual {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #0051BA;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px 0;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .ping-resultado.online {
+            border-color: #28a745;
+            background: #f0f8f5;
+        }
+
+        .ping-resultado.offline {
+            border-color: #dc3545;
+            background: #fff5f5;
+        }
+
+        .ping-resultado.procesando {
+            border-color: #0051BA;
+            background: #f0f5ff;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(0, 81, 186, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 0 12px rgba(0, 81, 186, 0);
+            }
+        }
+
+        .botones-accion {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 25px;
+        }
+
+        .btn-reintentar {
+            background: #0051BA;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.95em;
+            transition: all 0.3s ease;
+        }
+
+        .btn-reintentar:hover {
+            background: #003d8f;
+            transform: scale(1.05);
+        }
+
+        .btn-back {
+            background: #6c757d;
+        }
+
+        .btn-back:hover {
+            background: #5a6268;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 PING Individual</h1>
+            <p>Verificando conectividad del dispositivo</p>
+        </header>
+
+        <div class="content">
+            <div class="ping-individual-container">
+                <!-- Información del dispositivo -->
+                <div class="dispositivo-info">
+                    <h2 id="dispositivo-nombre">{{ nombre }}</h2>
+                    <div class="dispositivo-detalle">
+                        <span><strong>📍 IP:</strong> <span id="dispositivo-ip">{{ ip }}</span></span>
+                    </div>
+                    {% if hostname %}
+                    <div class="dispositivo-detalle">
+                        <span><strong>🏷️ Hostname:</strong> <span id="dispositivo-hostname">{{ hostname }}</span></span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Resultado del ping -->
+                <div class="ping-resultado procesando" id="resultado-ping">
+                    <div class="spinner-individual"></div>
+                    <div class="ping-intento">⏳ Iniciando ping...</div>
+                    <p style="color: #666;">Intentando conectar con el dispositivo...</p>
+                </div>
+
+                <!-- Botones de acción -->
+                <div class="botones-accion">
+                    <button class="btn-reintentar" onclick="reiniciarPing()" id="btn-reintentar" style="display: none;">🔄 Reintentar</button>
+                    <a href="/" class="btn-back" style="padding: 10px 20px; text-decoration: none; border-radius: 6px; border: none; cursor: pointer; display: inline-block;">⬅️ Volver al Menú</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const dispositivoId = {{ dispositivo_id }};
+        const ip = "{{ ip }}";
+        const hostname = "{{ hostname }}";
+        const resultado = document.getElementById("resultado-ping");
+        const btnReintentar = document.getElementById("btn-reintentar");
+
+        function iniciarPing() {
+            // Resetear estado
+            resultado.className = "ping-resultado procesando";
+            resultado.innerHTML = `
+                <div class="spinner-individual"></div>
+                <div class="ping-intento">⏳ Escaneando...</div>
+                <p style="color: #666;">Intentando conectar...</p>
+            `;
+            btnReintentar.style.display = "none";
+
+            // Conectar a EventSource
+            const eventSource = new EventSource(
+                `/api/ping_individual?id=${dispositivoId}&ip=${encodeURIComponent(ip)}&hostname=${encodeURIComponent(hostname)}`
+            );
+
+            console.log("🔌 Conectando a ping individual...");
+
+            eventSource.addEventListener("message", (event) => {
+                const data = JSON.parse(event.data);
+                console.log("📨 Evento recibido:", data.evento);
+
+                if (data.evento === "inicio") {
+                    console.log("✅ INICIO - Dispositivo:", data.nombre);
+                }
+
+                else if (data.evento === "intento_ping") {
+                    const { intento, max_intentos, exito } = data;
+                    console.log(`🔄 INTENTO ${intento}/${max_intentos} - ${exito ? '✅' : '❌'}`);
+                    
+                    resultado.innerHTML = `
+                        <div class="spinner-individual"></div>
+                        <div class="ping-intento">Intento ${intento}/${max_intentos}</div>
+                        <p style="color: #666;">${exito ? 'Dispositivo respondió ✅' : 'Reintentando...'}</p>
+                    `;
+                }
+
+                else if (data.evento === "resultado") {
+                    const datos = data.datos;
+                    const esOnline = datos.estado.includes("🟢");
+                    
+                    console.log(`🎯 RESULTADO - ${datos.estado}`);
+                    
+                    resultado.className = `ping-resultado ${esOnline ? 'online' : 'offline'}`;
+                    resultado.innerHTML = `
+                        <div class="ping-estado ${esOnline ? 'online' : 'offline'}">
+                            ${datos.estado}
+                        </div>
+                        <div class="ping-intento">
+                            ${esOnline ? '✅ Dispositivo conectado' : '❌ Dispositivo no responde'}
+                        </div>
+                        <p style="color: #666;">
+                            ${esOnline ? 
+                                `Respondió en intento ${datos.intentos}/3` : 
+                                `No respondió tras ${datos.intentos} intentos`
+                            }
+                        </p>
+                    `;
+                    
+                    btnReintentar.style.display = "inline-block";
+                    eventSource.close();
+                }
+
+                else if (data.evento === "error") {
+                    console.error(`❌ ERROR: ${data.mensaje}`);
+                    resultado.className = "ping-resultado offline";
+                    resultado.innerHTML = `
+                        <div class="ping-estado offline">❌ Error</div>
+                        <div class="ping-intento">Hubo un error</div>
+                        <p style="color: #666;">${data.mensaje}</p>
+                    `;
+                    btnReintentar.style.display = "inline-block";
+                    eventSource.close();
+                }
+            });
+
+            eventSource.onerror = (error) => {
+                console.error("❌ Error en EventSource:", error);
+                resultado.className = "ping-resultado offline";
+                resultado.innerHTML = `
+                    <div class="ping-estado offline">❌ Error de conexión</div>
+                    <div class="ping-intento">No se pudo conectar</div>
+                    <p style="color: #666;">Intenta de nuevo</p>
+                `;
+                btnReintentar.style.display = "inline-block";
+                eventSource.close();
+            };
+        }
+
+        function reiniciarPing() {
+            iniciarPing();
+        }
+
+        // Iniciar ping al cargar la página
+        document.addEventListener("DOMContentLoaded", iniciarPing);
+    </script>
+</body>
+</html>

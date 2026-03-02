@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resultados del PING - Preventivos</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .ping-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .dispositivo-ping {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .dispositivo-ping.online {
+            border-color: #28a745;
+            background: #f0f8f5;
+        }
+
+        .dispositivo-ping.offline {
+            border-color: #dc3545;
+            background: #fff5f5;
+        }
+
+        .dispositivo-ping.procesando {
+            border-color: #0051BA;
+            background: #f0f5ff;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(0, 81, 186, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 0 8px rgba(0, 81, 186, 0);
+            }
+        }
+
+        .info-dispositivo {
+            flex: 1;
+        }
+
+        .nombre-dispositivo {
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .detalles-dispositivo {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .ip-dispositivo {
+            font-family: monospace;
+            margin-right: 20px;
+        }
+
+        .estado-dispositivo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            min-width: 250px;
+            justify-content: flex-end;
+        }
+
+        .estado-badge {
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 1em;
+            white-space: nowrap;
+        }
+
+        .estado-badge.online {
+            background: #28a745;
+            color: white;
+        }
+
+        .estado-badge.offline {
+            background: #dc3545;
+            color: white;
+        }
+
+        .estado-badge.procesando-badge {
+            background: #0051BA;
+            color: white;
+            animation: pulse-text 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse-text {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .intentos-badge {
+            background: #6c757d;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #0051BA;
+            border-radius: 50%;
+            width: 25px;
+            height: 25px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .estadisticas {
+            background: linear-gradient(135deg, #0051BA 0%, #003399 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+        }
+
+        .estadistica-item {
+            flex: 1;
+        }
+
+        .estadistica-numero {
+            font-size: 2em;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .estadistica-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .progreso-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .progreso-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #0051BA, #FFED00);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .mensaje-estado {
+            text-align: center;
+            padding: 20px;
+            font-size: 1.1em;
+            color: #0051BA;
+            font-weight: 600;
+        }
+
+        .finalizado {
+            text-align: center;
+            padding: 30px;
+            background: #f0f8f5;
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .finalizado h3 {
+            color: #28a745;
+            margin: 0 0 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Resultados del PING en Directo</h1>
+            <p>Tienda: <strong id="tienda-header">{{ tienda }}</strong> | Tipo: <strong id="tipo-header">{{ tipo }}</strong></p>
+        </header>
+
+        <div class="content">
+            <!-- Barra de progreso -->
+            <div class="progreso-bar">
+                <div class="progreso-fill" id="progreso"></div>
+            </div>
+
+            <!-- Estadísticas en tiempo real -->
+            <div class="estadisticas">
+                <div class="estadistica-item">
+                    <div class="estadistica-numero" id="total-procesados">0</div>
+                    <div class="estadistica-label">Procesados</div>
+                </div>
+                <div class="estadistica-item">
+                    <div class="estadistica-numero" id="total-online" style="color: #90EE90;">0</div>
+                    <div class="estadistica-label">Online</div>
+                </div>
+                <div class="estadistica-item">
+                    <div class="estadistica-numero" id="total-offline" style="color: #FFB6C6;">0</div>
+                    <div class="estadistica-label">Offline</div>
+                </div>
+                <div class="estadistica-item">
+                    <div class="estadistica-numero" id="total" style="opacity: 0.7;">-</div>
+                    <div class="estadistica-label">Total</div>
+                </div>
+            </div>
+
+            <!-- Mensaje de estado -->
+            <div class="mensaje-estado" id="mensaje-estado">
+                ⏳ Iniciando ping...
+            </div>
+
+            <!-- Lista de dispositivos -->
+            <div class="ping-container" id="ping-container"></div>
+
+            <!-- Mensaje de finalización CON BOTÓN -->
+            <div id="finalizado" style="display: none;" class="finalizado">
+                <h3>✅ ¡Escaneo Completado!</h3>
+                <p>Todos los dispositivos han sido verificados correctamente.</p>
+                <a href="/" class="btn-back" style="display: inline-block; margin-top: 15px;">⬅️ Volver al Menú</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tipo = "{{ tipo }}";
+        const tienda = "{{ tienda }}";
+        const container = document.getElementById("ping-container");
+        const msgEstado = document.getElementById("mensaje-estado");
+        const progreso = document.getElementById("progreso");
+        const procesados = document.getElementById("total-procesados");
+        const online = document.getElementById("total-online");
+        const offline = document.getElementById("total-offline");
+        const total = document.getElementById("total");
+        const finalizado = document.getElementById("finalizado");
+
+        let estadisticas = {
+            total: 0,
+            procesados: 0,
+            online: 0,
+            offline: 0
+        };
+
+        let dispositivosActivos = {}; // Tracking de dispositivos en proceso
+
+        // Iniciar conexión Server-Sent Events (con URL encoding para caracteres especiales)
+        const tipoEncoded = encodeURIComponent(tipo);
+        const tiendaEncoded = encodeURIComponent(tienda);
+        const eventSource = new EventSource(`/api/ping_stream?tipo=${tipoEncoded}&tienda=${tiendaEncoded}`);
+
+        console.log("🔌 Conectando a EventSource...");
+
+        eventSource.addEventListener("message", (event) => {
+            const data = JSON.parse(event.data);
+            console.log("📨 Evento recibido:", data.evento, data);
+
+            if (data.evento === "inicio") {
+                console.log("✅ INICIO - Total dispositivos:", data.total);
+                estadisticas.total = data.total;
+                total.textContent = data.total;
+                msgEstado.textContent = `🔍 Escaneando ${data.total} dispositivos...`;
+            }
+
+            // NUEVO: Evento de intento individual
+            else if (data.evento === "intento_ping") {
+                const deviceId = data.dispositivo_id;
+                console.log(`🔄 INTENTO - ${data.nombre}: ${data.intento}/${data.max_intentos} - ${data.exito ? '✅' : '❌'}`);
+                
+                // Crear el elemento del dispositivo si no existe
+                if (!document.getElementById(`dispositivo-${deviceId}`)) {
+                    console.log(`📝 Creando elemento para ${data.nombre}`);
+                    
+                    const div = document.createElement("div");
+                    div.className = "dispositivo-ping procesando";
+                    div.id = `dispositivo-${deviceId}`;
+                    
+                    div.innerHTML = `
+                        <div class="info-dispositivo">
+                            <div class="nombre-dispositivo">${data.nombre}</div>
+                            <div class="detalles-dispositivo">
+                                <span class="ip-dispositivo">📍 ${data.ip}</span>
+                                ${data.hostname !== "N/A" ? `<span>🏷️ ${data.hostname}</span>` : ""}
+                            </div>
+                        </div>
+                        <div class="estado-dispositivo">
+                            <span class="intentos-badge" id="intento-badge-${deviceId}">${data.intento}/${data.max_intentos}</span>
+                            <div class="spinner"></div>
+                            <span class="estado-badge procesando-badge" id="estado-${deviceId}">⏳ Intentando...</span>
+                        </div>
+                    `;
+                    
+                    container.appendChild(div);
+                    dispositivosActivos[deviceId] = { nombre: data.nombre, intento: data.intento, exito: data.exito };
+                } else {
+                    // Actualizar el intento actual
+                    console.log(`🔄 Actualizando intento para ${data.nombre}`);
+                    
+                    const badgeElement = document.getElementById(`intento-badge-${deviceId}`);
+                    const estadoElement = document.getElementById(`estado-${deviceId}`);
+                    
+                    if (badgeElement) {
+                        badgeElement.textContent = `${data.intento}/${data.max_intentos}`;
+                    }
+                    
+                    if (estadoElement) {
+                        if (data.exito) {
+                            console.log(`✅ ÉXITO en intento ${data.intento} para ${data.nombre}`);
+                            estadoElement.textContent = "✅ Online";
+                            estadoElement.className = "estado-badge online";
+                        } else if (data.intento < data.max_intentos) {
+                            console.log(`❌ Intento ${data.intento} falló para ${data.nombre}`);
+                            estadoElement.textContent = `⏳ Reintentando... (${data.intento}/${data.max_intentos})`;
+                            estadoElement.className = "estado-badge procesando-badge";
+                        }
+                    }
+                }
+            }
+
+            // Evento de resultado final del dispositivo
+            else if (data.evento === "resultado") {
+                const resultado = data.datos;
+                console.log(`🎯 RESULTADO - ${resultado.nombre}: ${resultado.estado}`);
+                
+                const deviceElement = document.getElementById(`dispositivo-${resultado.id}`);
+                
+                if (deviceElement) {
+                    const esOnline = resultado.estado.includes("🟢");
+                    
+                    // Actualizar clases y contenido
+                    deviceElement.classList.remove("procesando");
+                    deviceElement.classList.add(esOnline ? "online" : "offline");
+                    
+                    // Actualizar estado badge
+                    const estadoElement = document.getElementById(`estado-${resultado.id}`);
+                    if (estadoElement) {
+                        estadoElement.textContent = resultado.estado;
+                        estadoElement.className = `estado-badge ${esOnline ? 'online' : 'offline'}`;
+                    }
+                    
+                    // Quitar spinner
+                    const spinner = deviceElement.querySelector(".spinner");
+                    if (spinner) {
+                        spinner.style.display = "none";
+                    }
+                }
+                
+                // Actualizar estadísticas
+                estadisticas.procesados++;
+                if (resultado.estado.includes("🟢")) {
+                    estadisticas.online++;
+                } else {
+                    estadisticas.offline++;
+                }
+
+                // Actualizar UI
+                procesados.textContent = estadisticas.procesados;
+                online.textContent = estadisticas.online;
+                offline.textContent = estadisticas.offline;
+
+                // Actualizar barra de progreso
+                const porcentaje = (estadisticas.procesados / estadisticas.total) * 100;
+                progreso.style.width = porcentaje + "%";
+
+                // Actualizar mensaje
+                msgEstado.textContent = `⏳ Procesando ${estadisticas.procesados} de ${estadisticas.total}...`;
+            }
+
+            else if (data.evento === "fin") {
+                console.log(`✅ FINALIZADO - Procesados: ${estadisticas.procesados}`);
+                msgEstado.textContent = `✅ ¡Escaneo finalizado! (${estadisticas.procesados} dispositivos procesados)`;
+                progreso.style.width = "100%";
+                finalizado.style.display = "block";
+                eventSource.close();
+            }
+
+            else if (data.evento === "error") {
+                console.error(`❌ ERROR: ${data.mensaje}`);
+                msgEstado.textContent = `❌ Error: ${data.mensaje}`;
+                msgEstado.style.color = "#dc3545";
+                eventSource.close();
+            }
+        });
+
+        eventSource.onerror = (error) => {
+            console.error("❌ Error en EventSource:", error);
+            msgEstado.textContent = "❌ Error en la conexión";
+            msgEstado.style.color = "#dc3545";
+            eventSource.close();
+        };
+    </script>
+</body>
+</html>
