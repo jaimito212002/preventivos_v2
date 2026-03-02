@@ -26,5 +26,15 @@ class Historial(Base):
     estado = Column(String, nullable=False)
     fecha = Column(DateTime, default=datetime.datetime.now)
 
+class Reporte(Base):
+    __tablename__ = "reportes"
+    id = Column(Integer, primary_key=True, index=True)
+    fecha = Column(DateTime, default=datetime.datetime.now)
+    tienda = Column(String, nullable=False)
+    tipo = Column(String, nullable=False)  # CAMBIO: tipo individual
+    total_dispositivos = Column(Integer, default=0)
+    dispositivos_online = Column(Integer, default=0)
+    dispositivos_offline = Column(Integer, default=0)
+
 # Crear las tablas
 Base.metadata.create_all(bind=engine)

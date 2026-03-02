@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial de Reportes - Preventivos</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .reportes-container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .dia-reporte {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .dia-reporte:hover {
+            border-color: #0051BA;
+            box-shadow: 0 4px 12px rgba(0, 81, 186, 0.1);
+        }
+
+        .dia-header {
+            background: linear-gradient(135deg, #0051BA 0%, #003d8f 100%);
+            color: white;
+            padding: 20px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .dia-header:hover {
+            background: linear-gradient(135deg, #003d8f 0%, #002560 100%);
+        }
+
+        .dia-fecha {
+            font-size: 1.3em;
+            font-weight: 700;
+        }
+
+        .dia-info {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .dia-toggle {
+            font-size: 1.5em;
+            transition: transform 0.3s ease;
+        }
+
+        .dia-toggle.activo {
+            transform: rotate(180deg);
+        }
+
+        .dia-contenido {
+            display: none;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .dia-contenido.activo {
+            display: block;
+        }
+
+        .tipo-escaneo {
+            background: white;
+            border-left: 4px solid #0051BA;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .tipo-escaneo:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transform: translateX(5px);
+        }
+
+        .tipo-nombre {
+            font-weight: 600;
+            font-size: 1.05em;
+            color: #333;
+        }
+
+        .tipo-stats {
+            display: flex;
+            gap: 20px;
+            font-size: 0.9em;
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .stat-online {
+            color: #28a745;
+            font-weight: 600;
+        }
+
+        .stat-offline {
+            color: #dc3545;
+            font-weight: 600;
+        }
+
+        .sin-reportes {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .sin-reportes h2 {
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .volver-menu {
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        .volver-menu a {
+            display: inline-block;
+            background: #0051BA;
+            color: white;
+            padding: 12px 30px;
+            border-radius: 6px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .volver-menu a:hover {
+            background: #003d8f;
+            transform: scale(1.05);
+        }
+
+        .selector-tienda {
+            margin-bottom: 20px;
+        }
+
+        .selector-tienda select {
+            padding: 10px;
+            border: 2px solid #0051BA;
+            border-radius: 6px;
+            font-size: 1em;
+            cursor: pointer;
+        }
+
+        @media (max-width: 600px) {
+            .dia-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .tipo-stats {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📊 Historial de Reportes</h1>
+            <p>Registros de escaneos realizados por tipo de dispositivo</p>
+        </header>
+
+        <div class="content">
+            <!-- Selector de tienda -->
+            <div class="selector-tienda">
+                <label for="tienda">Selecciona Tienda:</label>
+                <select id="tienda" onchange="cambiarTienda()">
+                    {% for t in todas_tiendas %}
+                        <option value="{{ t }}" {% if t == tienda_actual %}selected{% endif %}>{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Reportes -->
+            <div class="reportes-container">
+                {% if reportes_por_dia %}
+                    {% for fecha, datos in reportes_por_dia %}
+                        <div class="dia-reporte" data-fecha="{{ fecha }}">
+                            <div class="dia-header" onclick="toggleDia(this)">
+                                <div>
+                                    <div class="dia-fecha">📅 {{ fecha.strftime('%d/%m/%Y') }} - {{ fecha.strftime('%A') }}</div>
+                                    <div class="dia-info">{{ datos.reportes|length }} tipo(s) escaneado(s)</div>
+                                </div>
+                                <div class="dia-toggle">▼</div>
+                            </div>
+
+                            <div class="dia-contenido">
+                                {% for reporte in datos.reportes %}
+                                    <div class="tipo-escaneo">
+                                        <div class="tipo-nombre">🔹 {{ reporte.tipo }}</div>
+                                        <div class="tipo-stats">
+                                            <div class="stat-item">
+                                                <span>📱 Total:</span>
+                                                <span>{{ reporte.total_dispositivos }}</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-online">✅ Online:</span>
+                                                <span class="stat-online">{{ reporte.dispositivos_online }}</span>
+                                            </div>
+                                            <div class="stat-item">
+                                                <span class="stat-offline">❌ Offline:</span>
+                                                <span class="stat-offline">{{ reporte.dispositivos_offline }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="sin-reportes">
+                        <h2>📭 No hay reportes</h2>
+                        <p>Realiza tu primer escaneo para generar un reporte</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Volver al menú -->
+            <div class="volver-menu">
+                <a href="/?tienda={{ tienda_actual }}">⬅️ Volver al Menú Principal</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function cambiarTienda() {
+            const tienda = document.getElementById('tienda').value;
+            window.location.href = '/reportes?tienda=' + tienda;
+        }
+
+        function toggleDia(header) {
+            const contenido = header.nextElementSibling;
+            const toggle = header.querySelector('.dia-toggle');
+
+            contenido.classList.toggle('activo');
+            toggle.classList.toggle('activo');
+        }
+    </script>
+</body>
+</html>

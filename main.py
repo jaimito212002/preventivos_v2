@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request, Form, Query
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from db import Session, Dispositivo, Historial
+from db import Session, Dispositivo, Historial, Reporte
 from ping3 import ping
 import datetime
 import time
@@ -43,11 +43,12 @@ def obtener_todas_las_tiendas():
     finally:
         db.close()
 
-# --- FUNCIÓN PARA HACER PING CON REINTENTOS (OPTIMIZADA) ---
-def hacer_ping_con_reintentos_generador(ip: str, hostname: str = None, max_intentos: int = 3, timeout: int = 1):
+# --- FUNCIÓN PARA HACER PING CON REINTENTOS (ULTRA RÁPIDO) ---
+def hacer_ping_con_reintentos_generador(ip: str, hostname: str = None, max_intentos: int = 3, timeout: int = 0.2):
     """
     Intenta hacer ping a la IP con reintentos.
-    Genera eventos para cada intento (optimizado para velocidad).
+    Genera eventos para cada intento (ultra optimizado para velocidad).
+    timeout: 0.2s = 200ms (como cmd de Windows)
     """
     for intento in range(1, max_intentos + 1):
         try:
@@ -63,7 +64,7 @@ def hacer_ping_con_reintentos_generador(ip: str, hostname: str = None, max_inten
                 }
                 return True, intento
         except Exception as e:
-            print(f"Intento {intento}: Error pinging IP {ip}: {e}")
+            pass
         
         # Si la IP falla y hay hostname, intentar con hostname
         if hostname:
@@ -79,7 +80,7 @@ def hacer_ping_con_reintentos_generador(ip: str, hostname: str = None, max_inten
                     }
                     return True, intento
             except Exception as e:
-                print(f"Intento {intento}: Error pinging hostname {hostname}: {e}")
+                pass
         
         # Enviar evento de intento fallido (SIN PAUSA - es rápido)
         yield {
@@ -122,17 +123,31 @@ def menu(request: Request, tienda: str = Query(None)):
         for tipo in TIPOS_DISPONIBLES:
             conteo_por_tipo[tipo] = len([d for d in dispositivos_tienda if d.tipo == tipo])
         
+        # Pasar dispositivos como JSON para búsqueda en cliente
+        dispositivos_json = json.dumps([
+            {
+                "id": d.id,
+                "nombre": d.nombre,
+                "ip": d.ip,
+                "hostname": d.hostname if d.hostname else "",
+                "tipo": d.tipo,
+                "tienda": d.tienda
+            }
+            for d in dispositivos_tienda
+        ])
+        
         return templates.TemplateResponse("menu.html", {
             "request": request,
             "tienda_actual": tienda,
             "todas_tiendas": todas_tiendas,
             "tipos": TIPOS_DISPONIBLES,
-            "conteo_por_tipo": conteo_por_tipo
+            "conteo_por_tipo": conteo_por_tipo,
+            "dispositivos_json": dispositivos_json
         })
     finally:
         db.close()
 
-# --- NUEVA RUTA PARA INICIAR PING (REDIRIGE A RESULTADO) ---
+# --- RUTA PARA INICIAR PING POR TIPO (REDIRIGE A RESULTADO) ---
 @app.post("/ping_tipo")
 def ping_tipo(
     tipo: str = Form(...),
@@ -141,7 +156,7 @@ def ping_tipo(
     """Redirige a la página de resultado que hará el streaming"""
     return RedirectResponse(f"/resultado?tipo={tipo}&tienda={tienda}", status_code=303)
 
-# --- NUEVA PÁGINA DE RESULTADO CON STREAMING ---
+# --- PÁGINA DE RESULTADO CON STREAMING ---
 @app.get("/resultado")
 def resultado(request: Request, tipo: str = Query(...), tienda: str = Query(...)):
     """Página que iniciará el streaming de ping"""
@@ -151,7 +166,7 @@ def resultado(request: Request, tipo: str = Query(...), tienda: str = Query(...)
         "tienda": tienda
     })
 
-# --- NUEVO ENDPOINT PARA STREAMING DE PING (OPTIMIZADO) ---
+# --- ENDPOINT PARA STREAMING DE PING POR TIPO (OPTIMIZADO) ---
 @app.get("/api/ping_stream")
 async def ping_stream(tipo: str = Query(...), tienda: str = Query(...)):
     """
@@ -179,16 +194,25 @@ async def ping_stream(tipo: str = Query(...), tienda: str = Query(...)):
                 exito = False
                 intento_final = 0
                 
+                print(f"\n{'='*80}")
+                print(f"⏳ [{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] INICIANDO PING: {d.nombre}")
+                print(f"   📍 IP: {d.ip} | Hostname: {d.hostname if d.hostname else 'N/A'}")
+                print(f"   🔄 Intentos: 3 | Timeout: 200ms")
+                print(f"{'='*80}")
+                
                 for evento_intento in hacer_ping_con_reintentos_generador(
                     d.ip, 
                     d.hostname, 
                     max_intentos=3, 
-                    timeout=1  # Timeout más corto para ser más rápido
+                    timeout=0.2
                 ):
                     # Enviar evento de intento individual
                     if evento_intento["evento"] == "intento":
                         intento_final = evento_intento["intento"]
                         exito = evento_intento["exito"]
+                        
+                        estado_icon = "✅ RESPONDE" if exito else "❌ SIN RESPUESTA"
+                        print(f"   [{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] Intento {intento_final}/3: {estado_icon}")
                         
                         # Enviar el evento del intento
                         yield f"data: {json.dumps({
@@ -201,13 +225,6 @@ async def ping_stream(tipo: str = Query(...), tienda: str = Query(...)):
                             'max_intentos': evento_intento["max_intentos"],
                             'exito': exito
                         })}\n\n"
-                        
-                        print(f"[PING] {d.nombre} - Intento {intento_final}/{evento_intento['max_intentos']} - {'✅' if exito else '❌'}")
-                        
-                        # Pequeña pausa SOLO para visualización (opcional, muy corta)
-                        if not exito and intento_final < evento_intento["max_intentos"]:
-                            # Pausa muy corta entre reintentos fallidos (0.05s para que se vea)
-                            await asyncio.sleep(0.05)
                         
                         # Si tuvo éxito, salir del bucle
                         if exito:
@@ -230,11 +247,10 @@ async def ping_stream(tipo: str = Query(...), tienda: str = Query(...)):
                 resultados_finales.append(resultado)
                 
                 # Enviar resultado final del dispositivo
-                print(f"[RESULTADO] {d.nombre} - {estado}")
-                yield f"data: {json.dumps({'evento': 'resultado', 'datos': resultado})}\n\n"
+                print(f"   ✨ RESULTADO FINAL: {estado} (Intento {intento_final}/3)")
+                print(f"{'='*80}\n")
                 
-                # Pausa MUY PEQUEÑA para que no aparezcan todos del tirón (0.1s)
-                await asyncio.sleep(0.1)
+                yield f"data: {json.dumps({'evento': 'resultado', 'datos': resultado})}\n\n"
                 
                 # Guardar en historial
                 historial = Historial(
@@ -257,8 +273,153 @@ async def ping_stream(tipo: str = Query(...), tienda: str = Query(...)):
             # Enviar señal de fin
             yield f"data: {json.dumps({'evento': 'fin', 'total_procesados': len(resultados_finales)})}\n\n"
             
+            # Guardar REPORTE POR TIPO
+            total_online = sum(1 for r in resultados_finales if '🟢' in r['estado'])
+            total_offline = sum(1 for r in resultados_finales if '🔴' in r['estado'])
+            
+            # Obtener la fecha de hoy
+            fecha_hoy = datetime.datetime.now().date()
+            
+            # Buscar si ya existe un reporte para hoy, esta tienda Y este tipo
+            reporte_existente = db.query(Reporte).filter(
+                Reporte.tienda == tienda,
+                Reporte.tipo == tipo,
+                Reporte.fecha >= datetime.datetime.combine(fecha_hoy, datetime.time.min),
+                Reporte.fecha < datetime.datetime.combine(fecha_hoy, datetime.time.max)
+            ).first()
+            
+            if reporte_existente:
+                # Actualizar reporte existente (si hacemos ping dos veces al mismo tipo el mismo día)
+                reporte_existente.total_dispositivos = len(resultados_finales)
+                reporte_existente.dispositivos_online = total_online
+                reporte_existente.dispositivos_offline = total_offline
+            else:
+                # Crear nuevo reporte
+                nuevo_reporte = Reporte(
+                    fecha=datetime.datetime.now(),
+                    tienda=tienda,
+                    tipo=tipo,
+                    total_dispositivos=len(resultados_finales),
+                    dispositivos_online=total_online,
+                    dispositivos_offline=total_offline
+                )
+                db.add(nuevo_reporte)
+            
+            db.commit()
+            
         except Exception as e:
             print(f"Error en ping_stream: {e}")
+            import traceback
+            traceback.print_exc()
+            yield f"data: {json.dumps({'evento': 'error', 'mensaje': str(e)})}\n\n"
+        finally:
+            db.close()
+    
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+# --- NUEVA RUTA PARA PING INDIVIDUAL ---
+@app.get("/ping_individual")
+def ping_individual(
+    request: Request,
+    id: int = Query(...),
+    nombre: str = Query(...),
+    ip: str = Query(...),
+    hostname: str = Query(default="")
+):
+    """Página para hacer ping a un dispositivo individual"""
+    return templates.TemplateResponse("ping_individual.html", {
+        "request": request,
+        "dispositivo_id": id,
+        "nombre": nombre,
+        "ip": ip,
+        "hostname": hostname
+    })
+
+# --- NUEVO ENDPOINT PARA STREAMING DE PING INDIVIDUAL ---
+@app.get("/api/ping_individual")
+async def ping_individual_stream(id: int = Query(...), ip: str = Query(...), hostname: str = Query(default="")):
+    """
+    Endpoint que hace streaming de un ping individual.
+    """
+    import asyncio
+    
+    db = Session()
+    
+    async def generate():
+        try:
+            # Obtener dispositivo
+            dispositivo = db.query(Dispositivo).filter(Dispositivo.id == id).first()
+            if not dispositivo:
+                yield f"data: {json.dumps({'evento': 'error', 'mensaje': 'Dispositivo no encontrado'})}\n\n"
+                return
+            
+            # Enviar inicio
+            yield f"data: {json.dumps({'evento': 'inicio', 'nombre': dispositivo.nombre, 'ip': ip})}\n\n"
+            
+            # Hacer ping
+            exito = False
+            intento_final = 0
+            
+            print(f"\n{'='*80}")
+            print(f"🎯 [{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] PING INDIVIDUAL: {dispositivo.nombre}")
+            print(f"   📍 IP: {ip} | Hostname: {dispositivo.hostname if dispositivo.hostname else 'N/A'}")
+            print(f"   🔄 Intentos: 3 | Timeout: 200ms")
+            print(f"{'='*80}")
+            
+            for evento_intento in hacer_ping_con_reintentos_generador(
+                ip,
+                dispositivo.hostname if dispositivo.hostname else hostname,
+                max_intentos=3,
+                timeout=0.2
+            ):
+                if evento_intento["evento"] == "intento":
+                    intento_final = evento_intento["intento"]
+                    exito = evento_intento["exito"]
+                    
+                    estado_icon = "✅ RESPONDE" if exito else "❌ SIN RESPUESTA"
+                    print(f"   [{datetime.datetime.now().strftime('%H:%M:%S.%f')[:-3]}] Intento {intento_final}/3: {estado_icon}")
+                    
+                    yield f"data: {json.dumps({
+                        'evento': 'intento_ping',
+                        'intento': intento_final,
+                        'max_intentos': evento_intento["max_intentos"],
+                        'exito': exito
+                    })}\n\n"
+                    
+                    if exito:
+                        break
+            
+            # Resultado final
+            estado = "🟢 Online" if exito else "🔴 Offline"
+            
+            resultado = {
+                "id": id,
+                "nombre": dispositivo.nombre,
+                "ip": ip,
+                "hostname": dispositivo.hostname if dispositivo.hostname else hostname,
+                "estado": estado,
+                "intentos": intento_final
+            }
+            
+            print(f"   ✨ RESULTADO FINAL: {estado} (Intento {intento_final}/3)")
+            print(f"{'='*80}\n")
+            
+            yield f"data: {json.dumps({'evento': 'resultado', 'datos': resultado})}\n\n"
+            
+            # Guardar en historial
+            historial = Historial(
+                dispositivo=dispositivo.nombre,
+                estado=estado,
+                fecha=datetime.datetime.now()
+            )
+            db.add(historial)
+            db.commit()
+            
+            # Enviar fin
+            yield f"data: {json.dumps({'evento': 'fin'})}\n\n"
+            
+        except Exception as e:
+            print(f"Error en ping_individual_stream: {e}")
             import traceback
             traceback.print_exc()
             yield f"data: {json.dumps({'evento': 'error', 'mensaje': str(e)})}\n\n"
@@ -485,6 +646,56 @@ def eliminar_tienda(tienda: str = Form(...)):
     except Exception as e:
         print(f"Error al eliminar tienda: {e}")
         return RedirectResponse(f"/?tienda={tienda}", status_code=303)
+    finally:
+        db.close()
+
+# --- PÁGINA DE HISTORIAL DE REPORTES ---
+@app.get("/reportes")
+def ver_reportes(request: Request, tienda: str = Query(None)):
+    db = Session()
+    try:
+        # Obtener todas las tiendas dinámicamente
+        todas_tiendas = obtener_todas_las_tiendas()
+        
+        # Si no hay tiendas, mostrar página vacía
+        if not todas_tiendas:
+            return templates.TemplateResponse("reportes_vacio.html", {
+                "request": request
+            })
+        
+        # Si no se especifica tienda, usar la primera
+        if not tienda:
+            tienda = todas_tiendas[0]
+        
+        # Si la tienda actual no existe, usar la primera
+        if tienda not in todas_tiendas:
+            tienda = todas_tiendas[0]
+        
+        # Obtener reportes de la tienda ordenados por fecha descendente
+        reportes = db.query(Reporte).filter(
+            Reporte.tienda == tienda
+        ).order_by(Reporte.fecha.desc()).all()
+        
+        # Agrupar reportes por día
+        reportes_por_dia = {}
+        for reporte in reportes:
+            fecha_dia = reporte.fecha.date()
+            if fecha_dia not in reportes_por_dia:
+                reportes_por_dia[fecha_dia] = {
+                    'fecha': fecha_dia,
+                    'reportes': []
+                }
+            reportes_por_dia[fecha_dia]['reportes'].append(reporte)
+        
+        # Convertir a lista ordenada por fecha descendente
+        dias_ordenados = sorted(reportes_por_dia.items(), key=lambda x: x[0], reverse=True)
+        
+        return templates.TemplateResponse("reportes.html", {
+            "request": request,
+            "tienda_actual": tienda,
+            "todas_tiendas": todas_tiendas,
+            "reportes_por_dia": dias_ordenados
+        })
     finally:
         db.close()
 

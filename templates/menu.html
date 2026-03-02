@@ -5,6 +5,93 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Preventivos - Dashboard</title>
     <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .dispositivo-resultado {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .dispositivo-resultado:hover {
+            border-color: #0051BA;
+            box-shadow: 0 2px 8px rgba(0, 81, 186, 0.15);
+            transform: translateX(5px);
+        }
+
+        .info-dispositivo-resultado {
+            flex: 1;
+        }
+
+        .nombre-dispositivo-resultado {
+            font-weight: 600;
+            font-size: 1.05em;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .detalles-dispositivo-resultado {
+            font-size: 0.9em;
+            color: #666;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .detalles-dispositivo-resultado span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .badge-tipo {
+            background: #0051BA;
+            color: white;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        .btn-ping-individual {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            margin-left: 10px;
+        }
+
+        .btn-ping-individual:hover {
+            background: #218838;
+            transform: scale(1.05);
+        }
+
+        .dispositivos-encontrados {
+            margin-bottom: 20px;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -33,42 +120,57 @@
         </div>
 
         <div class="content">
-            <!-- BARRA DE BÚSQUEDA -->
+            <!-- BARRA DE BÚSQUEDA DE DISPOSITIVOS -->
             <div class="barra-busqueda">
-                <input type="text" id="busqueda" placeholder="🔍 Buscar tipo de dispositivo..." onkeyup="filtrarTipos()">
+                <input type="text" id="busqueda" placeholder="🔍 Buscar dispositivo por nombre, IP o hostname..." onkeyup="buscarDispositivos()">
                 <button class="btn-limpiar" onclick="limpiarBusqueda()">✕ Limpiar</button>
             </div>
 
-            <div class="tipos-grid" id="tipos-grid">
-                {% for tipo in tipos %}
-                    <div class="tipo-card" data-tipo="{{ tipo }}">
-                        <h2>{{ tipo }}</h2>
-                        <form method="POST" action="/ping_tipo" class="ping-form">
-                            <input type="hidden" name="tipo" value="{{ tipo }}">
-                            <input type="hidden" name="tienda" value="{{ tienda_actual }}">
-                            <button type="submit" class="btn-ping">🔔 PING</button>
-                        </form>
-                        <div class="device-count">
-                            <p>
-                                {% set count = conteo_por_tipo.get(tipo, 0) %}
-                                {% if count == 0 %}
-                                    <span class="sin-dispositivos">Sin dispositivos</span>
-                                {% elif count == 1 %}
-                                    {{ count }} dispositivo
-                                {% else %}
-                                    {{ count }} dispositivos
-                                {% endif %}
-                            </p>
-                        </div>
-                    </div>
-                {% endfor %}
+            <!-- RESULTADOS DE BÚSQUEDA (SOLO APARECE SI HAY BÚSQUEDA) -->
+            <div id="resultados-busqueda" style="display: none;">
+                <div id="lista-dispositivos" class="dispositivos-encontrados"></div>
+                <button onclick="ocultarResultados()" class="btn-back" style="margin-top: 20px;">⬅️ Volver a tipos de dispositivos</button>
             </div>
 
-            <div class="admin-section">
-                <a href="/dispositivos?tienda={{ tienda_actual }}" class="btn-devices">📱 Gestionar Dispositivos</a>
-                <a href="/add_dispositivo" class="btn-add">➕ Agregar Dispositivo</a>
+            <!-- VISTA NORMAL DE TIPOS (SE OCULTA CUANDO BUSCAS) -->
+            <div id="vista-tipos" style="display: block;">
+                <div class="tipos-grid" id="tipos-grid">
+                    {% for tipo in tipos %}
+                        <div class="tipo-card" data-tipo="{{ tipo }}">
+                            <h2>{{ tipo }}</h2>
+                            <form method="POST" action="/ping_tipo" class="ping-form">
+                                <input type="hidden" name="tipo" value="{{ tipo }}">
+                                <input type="hidden" name="tienda" value="{{ tienda_actual }}">
+                                <button type="submit" class="btn-ping">🔔 PING</button>
+                            </form>
+                            <div class="device-count">
+                                <p>
+                                    {% set count = conteo_por_tipo.get(tipo, 0) %}
+                                    {% if count == 0 %}
+                                        <span class="sin-dispositivos">Sin dispositivos</span>
+                                    {% elif count == 1 %}
+                                        {{ count }} dispositivo
+                                    {% else %}
+                                        {{ count }} dispositivos
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <div class="admin-section">
+                    <a href="/dispositivos?tienda={{ tienda_actual }}" class="btn-devices">📱 Gestionar Dispositivos</a>
+                    <a href="/add_dispositivo" class="btn-add">➕ Agregar Dispositivo</a>
+                    <a href="/reportes?tienda={{ tienda_actual }}" class="btn-devices" style="background: #17a2b8;">📊 Historial de Reportes</a>
+                </div>
             </div>
         </div>
+
+        <!-- DATOS JSON CON DISPOSITIVOS (OCULTO) -->
+        <script type="application/json" id="dispositivos-data">
+{{ dispositivos_json | safe }}
+        </script>
     </div>
 
     <footer>
@@ -84,6 +186,39 @@
     </footer>
 
     <script>
+        // Datos de dispositivos que pasamos desde el servidor
+        let todosDispositivos = [];
+
+        // Cargar datos de dispositivos al iniciar
+        function cargarDispositivos() {
+            const dataElement = document.getElementById('dispositivos-data');
+            console.log('🔍 Buscando elemento dispositivos-data...');
+            
+            if (dataElement) {
+                console.log('✅ Elemento encontrado');
+                const texto = dataElement.textContent.trim();
+                console.log('📝 Contenido:', texto.substring(0, 100) + '...');
+                
+                if (texto && texto !== '[]') {
+                    try {
+                        todosDispositivos = JSON.parse(texto);
+                        console.log('✅ Dispositivos cargados:', todosDispositivos.length);
+                        console.log('📋 Primero:', todosDispositivos[0]);
+                    } catch (e) {
+                        console.error('❌ Error al parsear JSON:', e);
+                        console.error('🔍 Texto a parsear:', texto);
+                        todosDispositivos = [];
+                    }
+                } else {
+                    console.log('⚠️ Elemento vacío o no hay dispositivos');
+                    todosDispositivos = [];
+                }
+            } else {
+                console.error('❌ Elemento dispositivos-data NO encontrado');
+                todosDispositivos = [];
+            }
+        }
+
         function cambiarTienda() {
             const tienda = document.getElementById('tienda').value;
             window.location.href = '/?tienda=' + tienda;
@@ -93,27 +228,90 @@
             return confirm(`⚠️ ¿Estás SEGURO de que quieres eliminar TODA la tienda "${tienda}" y todos sus dispositivos?\n\n⛔ Esta acción NO se puede deshacer.`);
         }
 
-        // Función para filtrar tipos
-        function filtrarTipos() {
-            const busqueda = document.getElementById('busqueda').value.toLowerCase();
-            const tarjetas = document.querySelectorAll('.tipo-card');
+        // NUEVA FUNCIÓN: Buscar dispositivos por nombre, IP o hostname
+        function buscarDispositivos() {
+            const busqueda = document.getElementById('busqueda').value.toLowerCase().trim();
+            const resultadosDiv = document.getElementById('resultados-busqueda');
+            const vistaTypes = document.getElementById('vista-tipos');
+            const listaDiv = document.getElementById('lista-dispositivos');
 
-            tarjetas.forEach(tarjeta => {
-                const tipo = tarjeta.getAttribute('data-tipo').toLowerCase();
-                if (tipo.includes(busqueda)) {
-                    tarjeta.style.display = '';
-                } else {
-                    tarjeta.style.display = 'none';
+            console.log('🔍 Buscando:', busqueda);
+            console.log('📊 Total dispositivos:', todosDispositivos.length);
+
+            // Si está vacío, mostrar vista normal
+            if (!busqueda) {
+                resultadosDiv.style.display = 'none';
+                vistaTypes.style.display = 'block';
+                return;
+            }
+
+            // Buscar dispositivos
+            const encontrados = todosDispositivos.filter(d => {
+                const coincide = d.nombre.toLowerCase().includes(busqueda) ||
+                       d.ip.toLowerCase().includes(busqueda) ||
+                       (d.hostname && d.hostname.toLowerCase().includes(busqueda));
+                
+                if (coincide) {
+                    console.log('✅ Encontrado:', d.nombre);
                 }
+                return coincide;
             });
+
+            console.log('📋 Encontrados:', encontrados.length);
+
+            // Mostrar resultados
+            if (encontrados.length > 0) {
+                listaDiv.innerHTML = encontrados.map(d => `
+                    <div class="dispositivo-resultado">
+                        <div class="info-dispositivo-resultado">
+                            <div class="nombre-dispositivo-resultado">${d.nombre}</div>
+                            <div class="detalles-dispositivo-resultado">
+                                <span>📍 ${d.ip}</span>
+                                ${d.hostname ? `<span>🏷️ ${d.hostname}</span>` : ''}
+                                <span class="badge-tipo">${d.tipo}</span>
+                            </div>
+                        </div>
+                        <button class="btn-ping-individual" onclick="hacerPingIndividual(${d.id}, '${d.nombre.replace(/'/g, "\\'")}', '${d.ip.replace(/'/g, "\\'")}', '${d.hostname ? d.hostname.replace(/'/g, "\\'") : ''}')">
+                            🔔 PING
+                        </button>
+                    </div>
+                `).join('');
+
+                resultadosDiv.style.display = 'block';
+                vistaTypes.style.display = 'none';
+            } else {
+                listaDiv.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #999;">
+                        <p style="font-size: 1.2em; margin-bottom: 10px;">📭 No se encontraron dispositivos</p>
+                        <p>Intenta buscar por nombre, IP u hostname diferente</p>
+                    </div>
+                `;
+                resultadosDiv.style.display = 'block';
+                vistaTypes.style.display = 'none';
+            }
         }
 
-        // Función para limpiar búsqueda
+        // Nueva función para hacer ping individual
+        function hacerPingIndividual(id, nombre, ip, hostname) {
+            // Redirigir a página de ping individual
+            window.location.href = `/ping_individual?id=${id}&nombre=${encodeURIComponent(nombre)}&ip=${encodeURIComponent(ip)}&hostname=${encodeURIComponent(hostname)}`;
+        }
+
+        // Limpiar búsqueda
         function limpiarBusqueda() {
             document.getElementById('busqueda').value = '';
-            filtrarTipos();
+            document.getElementById('resultados-busqueda').style.display = 'none';
+            document.getElementById('vista-tipos').style.display = 'block';
             document.getElementById('busqueda').focus();
         }
+
+        // Ocultar resultados y volver a tipos
+        function ocultarResultados() {
+            limpiarBusqueda();
+        }
+
+        // Cargar dispositivos al iniciar la página
+        document.addEventListener('DOMContentLoaded', cargarDispositivos);
     </script>
 </body>
 </html>
